@@ -39,6 +39,11 @@
         "category": "VSTranslate"
       },
       {
+        "command": "vstranslate.translateWorkspace",
+        "title": "Translate Whole Workspace",
+        "category": "VSTranslate"
+      },
+      {
         "command": "vstranslate.clearOverlay",
         "title": "Clear Translation Overlay",
         "category": "VSTranslate"
@@ -65,6 +70,11 @@
           "command": "vstranslate.translateFile",
           "when": "editorIsOpen",
           "group": "vstranslate@4"
+        },
+        {
+          "command": "vstranslate.translateWorkspace",
+          "when": "editorIsOpen",
+          "group": "vstranslate@5"
         }
       ]
     },
