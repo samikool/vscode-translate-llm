@@ -20,7 +20,17 @@
     "commands": [
       {
         "command": "vstranslate.translate",
-        "title": "Translate Selection to English",
+        "title": "Show Translated Comments",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.replaceComments",
+        "title": "Replace Comments with Translation",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.insertComments",
+        "title": "Insert Translated Comments",
         "category": "VSTranslate"
       },
       {
@@ -35,6 +45,16 @@
           "command": "vstranslate.translate",
           "when": "editorHasSelection",
           "group": "vstranslate@1"
+        },
+        {
+          "command": "vstranslate.replaceComments",
+          "when": "editorHasSelection",
+          "group": "vstranslate@2"
+        },
+        {
+          "command": "vstranslate.insertComments",
+          "when": "editorHasSelection",
+          "group": "vstranslate@3"
         }
       ]
     },
