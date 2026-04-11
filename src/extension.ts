@@ -307,7 +307,7 @@ export function activate(context: vscode.ExtensionContext): void {
               const originalText = doc.getText();
               await vscode.workspace.applyEdit(buildEdit(uri, doc, result, pick.mode));
               originals.set(uri, originalText);
-            } catch (err) {
+            } catch {
               failedFile = fileName;
               break;
             }
