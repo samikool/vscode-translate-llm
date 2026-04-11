@@ -6,7 +6,7 @@
   "publisher": "samikool",
   "repository": {
     "type": "git",
-    "url": "https://github.com/samikool/vscode-translate"
+    "url": "https://github.com/samikool/vscode-translate-llm"
   },
   "engines": {
     "vscode": "^1.85.0"

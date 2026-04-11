@@ -26,7 +26,7 @@ A VS Code extension that translates non-English code comments into English inlin
 
 Until VSTranslate is available on the VS Code Marketplace, you can install it manually from a `.vsix` file:
 
-1. Download the latest `.vsix` from the [Releases](https://github.com/samikool/vscode-translate/releases) page
+1. Download the latest `.vsix` from the [Releases](https://github.com/samikool/vscode-translate-llm/releases) page
 2. Open VS Code and go to the Extensions view (`Ctrl+Shift+X`)
 3. Click the `...` menu at the top right and select **Install from VSIX...**
 4. Select the downloaded file
