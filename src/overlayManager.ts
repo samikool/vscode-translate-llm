@@ -22,10 +22,6 @@ export class OverlayManager {
   }
 
   private createDecorationType(): vscode.TextEditorDecorationType {
-    const color = vscode.workspace
-      .getConfiguration("vstranslate")
-      .get<string>("overlayColor", "#4EC9B0");
-
     return vscode.window.createTextEditorDecorationType({
       after: {
         color: new vscode.ThemeColor("vstranslate.overlayForeground"),
