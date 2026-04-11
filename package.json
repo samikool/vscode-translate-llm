@@ -1,5 +1,5 @@
 {
-  "name": "vscode-translate",
+  "name": "vscode-translate-llm",
   "displayName": "VSTranslate",
   "description": "Translate code comments from any language to English using Ollama",
   "version": "0.0.1",
