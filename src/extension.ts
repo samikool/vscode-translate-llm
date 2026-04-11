@@ -66,21 +66,23 @@ interface LineInfo extends CommentInfo {
   line: number;
 }
 
-// Extracts comments from the selection and sends them to Ollama.
-// Returns translated lines (already-English lines are filtered out), plus
-// the per-line metadata needed for edits. Returns null on error.
+// Extracts comments from the given range (defaults to the current selection)
+// and sends them to Ollama. Returns translated lines (already-English lines
+// are filtered out), plus the per-line metadata needed for edits. Returns null
+// if there is nothing to translate.
 async function getTranslations(
-  editor: vscode.TextEditor
+  editor: vscode.TextEditor,
+  range?: vscode.Range
 ): Promise<{ translations: { line: number; text: string }[]; infoByLine: Map<number, LineInfo> } | null> {
-  const selection = editor.selection;
-  if (selection.isEmpty) {
+  const effectiveRange = range ?? editor.selection;
+  if (!range && editor.selection.isEmpty) {
     vscode.window.showInformationMessage("VSTranslate: Select the text you want to translate first.");
     return null;
   }
 
   const languageId = editor.document.languageId;
   const lines: LineInfo[] = [];
-  for (let i = selection.start.line; i <= selection.end.line; i++) {
+  for (let i = effectiveRange.start.line; i <= effectiveRange.end.line; i++) {
     const info = extractComment(editor.document.lineAt(i).text, languageId);
     if (info && info.text.length > 0) {
       lines.push({ line: i, ...info });
@@ -184,6 +186,46 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  // Command 4: translate whole file — prompts for replace or insert mode
+  const translateFileCommand = vscode.commands.registerCommand(
+    "vstranslate.translateFile",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "Replace Comments with Translation", mode: "replace" },
+          { label: "Insert Translated Comments", mode: "insert" },
+        ],
+        { placeHolder: "How should the translations be applied?" }
+      );
+      if (!pick) { return; }
+
+      try {
+        const doc = editor.document;
+        const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+        const result = await getTranslations(editor, fileRange);
+        if (!result) { return; }
+
+        const edit = new vscode.WorkspaceEdit();
+        for (const t of result.translations) {
+          const info = result.infoByLine.get(t.line);
+          if (!info) { continue; }
+          const commentStart = info.prefixStart + info.prefix.length;
+          const range = new vscode.Range(t.line, commentStart, t.line, doc.lineAt(t.line).text.length);
+          const replacement = pick.mode === "replace"
+            ? ` ${t.text}`
+            : ` ${t.text} ${info.prefix} ${info.text}`;
+          edit.replace(doc.uri, range, replacement);
+        }
+        await vscode.workspace.applyEdit(edit);
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  );
+
   const clearCommand = vscode.commands.registerCommand(
     "vstranslate.clearOverlay",
     () => { overlayManager.clear(); }
@@ -198,6 +240,7 @@ export function activate(context: vscode.ExtensionContext): void {
     translateCommand,
     replaceCommand,
     insertCommand,
+    translateFileCommand,
     clearCommand,
     selectionChangeListener,
     overlayManager
