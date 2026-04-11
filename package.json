@@ -2,7 +2,7 @@
   "name": "vscode-translate-llm",
   "displayName": "VSTranslate",
   "description": "Translate code comments from any language to English using Ollama",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "samikool",
   "repository": {
     "type": "git",
