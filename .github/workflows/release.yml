@@ -49,10 +49,10 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
-      - name: Merge release tag into master
+      - name: Backmerge master into dev
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout master
-          git merge --ff-only ${{ github.ref_name }}
-          git push origin master
+          git checkout dev
+          git merge --no-edit origin/master
+          git push origin dev
