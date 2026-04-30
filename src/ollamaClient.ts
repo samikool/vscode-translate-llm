@@ -6,14 +6,17 @@ export interface OllamaConfig {
   endpoint: string;
   model: string;
   apiKey: string;
+  timeoutMs: number; // milliseconds; 0 means no timeout
 }
 
 export function getOllamaConfig(): OllamaConfig {
   const config = vscode.workspace.getConfiguration("vstranslate");
+  const timeoutSecs = config.get<number>("ollamaTimeout", 30);
   return {
     endpoint: config.get<string>("ollamaEndpoint", "http://localhost:11434").replace(/\/$/, ""),
     model: config.get<string>("ollamaModel", "llama3"),
     apiKey: config.get<string>("ollamaApiKey", ""),
+    timeoutMs: timeoutSecs === -1 ? 0 : timeoutSecs * 1000,
   };
 }
 
@@ -93,10 +96,12 @@ export async function translateWithOllama(lines: { line: number; text: string }[
     );
 
     req.on("error", (err) => reject(new Error(`Connection failed: ${err.message}`)));
-    req.setTimeout(30000, () => {
-      req.destroy();
-      reject(new Error("Request timed out after 30s"));
-    });
+    if (config.timeoutMs > 0) {
+      req.setTimeout(config.timeoutMs, () => {
+        req.destroy();
+        reject(new Error(`Request timed out after ${config.timeoutMs / 1000}s`));
+      });
+    }
 
     req.write(body);
     req.end();
