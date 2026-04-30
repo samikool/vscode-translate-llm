@@ -1,0 +1,42 @@
+/* This file contains CSS written with Arabic comments */
+
+/* ------ متغيرات الألوان الأساسية ------ */
+:root {
+    --color-primary: #4ec9b0;   /* لون أساسي فيروزي */
+    --color-secondary: #252525; /* لون خلفية داكن */
+    --color-text: #e9dbb7;      /* لون النص الرئيسي */
+    --color-accent: #c678dd;    /* لون التمييز البنفسجي */
+}
+
+/*
+ * أنماط لوحة الإحصاءات.
+ * تستخدم شبكة CSS للتخطيط.
+ */
+.stats-panel {
+    display: grid;                         /* استخدام تخطيط الشبكة */
+    grid-template-columns: repeat(5, 1fr); /* خمسة أعمدة متساوية */
+    gap: 1rem;                             /* مسافة بين العناصر */
+    background: var(--color-secondary);
+    padding: 1.5rem;
+}
+
+/* نمط كل بطاقة إحصائية */
+.stat-card {
+    background: #2d2d2d;                          /* خلفية البطاقة */
+    border-left: 3px solid var(--color-primary);  /* حد جانبي ملون */
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+/* ------ أنماط القيم العددية ------ */
+.stat-value {
+    font-size: 2rem;             /* حجم الخط الكبير للأرقام */
+    color: var(--color-primary);
+    font-weight: bold;           /* خط عريض للتمييز */
+}
+
+.stat-label {
+    font-size: 0.85rem;          /* حجم خط صغير للتسميات */
+    color: var(--color-text);
+    text-transform: uppercase;   /* تحويل النص إلى أحرف كبيرة */
+}
