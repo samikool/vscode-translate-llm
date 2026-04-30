@@ -4,6 +4,13 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
+## [0.3.2] — 2026-04-30
+
+### Fixed
+- Extension icon now displays correctly on the VS Code Marketplace (converted from JPEG to PNG)
+
+---
+
 ## [0.3.1] — 2026-04-30
 
 ### Added
