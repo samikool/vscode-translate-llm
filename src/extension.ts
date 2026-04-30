@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { translateWithOllama } from "./ollamaClient";
+import { translateWithOllama, getOllamaModels } from "./ollamaClient";
 import { OverlayManager } from "./overlayManager";
 
 const COMMENT_PREFIXES: Record<string, string[]> = {
@@ -434,6 +434,43 @@ export function activate(context: vscode.ExtensionContext): void {
     () => { overlayManager.clear(); }
   );
 
+  // Command: pick a model from the ones available on the configured Ollama instance
+  const selectModelCommand = vscode.commands.registerCommand(
+    "vstranslate.selectModel",
+    async () => {
+      let models: string[];
+      try {
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: "VSTranslate", cancellable: false },
+          async (progress) => {
+            progress.report({ message: "Fetching models from Ollama…" });
+            models = await getOllamaModels();
+          }
+        );
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+
+      if (models!.length === 0) {
+        vscode.window.showInformationMessage("VSTranslate: No models found on the Ollama instance.");
+        return;
+      }
+
+      const currentModel = vscode.workspace.getConfiguration("vstranslate").get<string>("ollamaModel", "");
+      const items = models!.map((name) => ({
+        label: name,
+        description: name === currentModel ? "current" : undefined,
+      }));
+
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Select an Ollama model" });
+      if (!pick) { return; }
+
+      await vscode.workspace.getConfiguration("vstranslate").update("ollamaModel", pick.label, vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(`VSTranslate: Model set to "${pick.label}".`);
+    }
+  );
+
   // Auto-clear overlay when the user moves the cursor or changes the selection
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     () => { overlayManager.clear(); }
@@ -446,6 +483,7 @@ export function activate(context: vscode.ExtensionContext): void {
     translateFileCommand,
     translateWorkspaceCommand,
     clearCommand,
+    selectModelCommand,
     selectionChangeListener,
     overlayManager
   );

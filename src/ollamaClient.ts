@@ -27,6 +27,58 @@ Do not add extra lines, explanations, or blank lines. If a line is already in En
 Lines to translate:
 `;
 
+// Fetches the list of models available on the configured Ollama instance.
+export async function getOllamaModels(): Promise<string[]> {
+  const config = getOllamaConfig();
+  const url = `${config.endpoint}/api/tags`;
+
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const isHttps = parsedUrl.protocol === "https:";
+    const transport = isHttps ? https : http;
+
+    const headers: Record<string, string> = {};
+    if (config.apiKey) {
+      headers["Authorization"] = `Bearer ${config.apiKey}`;
+    }
+
+    const req = transport.request(
+      {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || (isHttps ? 443 : 80),
+        path: parsedUrl.pathname,
+        method: "GET",
+        headers,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`Ollama API error ${res.statusCode}: ${data}`));
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            const models: string[] = (parsed.models ?? []).map((m: { name: string }) => m.name);
+            resolve(models.sort());
+          } catch {
+            reject(new Error(`Failed to parse Ollama response: ${data}`));
+          }
+        });
+      }
+    );
+
+    req.on("error", (err) => reject(new Error(`Connection failed: ${err.message}`)));
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error("Request timed out after 10s"));
+    });
+
+    req.end();
+  });
+}
+
 export interface LineTranslation {
   line: number;
   text: string;
