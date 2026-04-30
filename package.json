@@ -58,17 +58,17 @@
       "editor/context": [
         {
           "command": "vstranslate.translate",
-          "when": "editorHasSelection",
+          "when": "editorTextFocus",
           "group": "vstranslate@1"
         },
         {
           "command": "vstranslate.replaceComments",
-          "when": "editorHasSelection",
+          "when": "editorTextFocus",
           "group": "vstranslate@2"
         },
         {
           "command": "vstranslate.insertComments",
-          "when": "editorHasSelection",
+          "when": "editorTextFocus",
           "group": "vstranslate@3"
         },
         {
@@ -118,7 +118,7 @@
         "command": "vstranslate.translate",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t",
-        "when": "editorHasSelection"
+        "when": "editorTextFocus"
       }
     ]
   },
