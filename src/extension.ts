@@ -149,6 +149,13 @@ function showUndoNotification(message: string, originals: Map<vscode.Uri, string
   });
 }
 
+// Returns the selection if non-empty, otherwise a range covering just the cursor line.
+function getEffectiveRange(editor: vscode.TextEditor): vscode.Range {
+  if (!editor.selection.isEmpty) { return editor.selection; }
+  const line = editor.selection.active.line;
+  return new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length);
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   const overlayManager = new OverlayManager();
 
@@ -158,13 +165,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
-      if (editor.selection.isEmpty) {
-        vscode.window.showInformationMessage("VSTranslate: Select the text you want to translate first.");
-        return;
-      }
 
       try {
-        const result = await getTranslations(editor.document, editor.selection);
+        const result = await getTranslations(editor.document, getEffectiveRange(editor));
         if (result) {
           overlayManager.showTranslation(editor, result.translations);
         }
@@ -180,13 +183,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
-      if (editor.selection.isEmpty) {
-        vscode.window.showInformationMessage("VSTranslate: Select the text you want to translate first.");
-        return;
-      }
 
       try {
-        const result = await getTranslations(editor.document, editor.selection);
+        const result = await getTranslations(editor.document, getEffectiveRange(editor));
         if (!result) { return; }
         await vscode.workspace.applyEdit(buildEdit(editor.document.uri, editor.document, result, "replace"));
       } catch (err) {
@@ -201,13 +200,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
-      if (editor.selection.isEmpty) {
-        vscode.window.showInformationMessage("VSTranslate: Select the text you want to translate first.");
-        return;
-      }
 
       try {
-        const result = await getTranslations(editor.document, editor.selection);
+        const result = await getTranslations(editor.document, getEffectiveRange(editor));
         if (!result) { return; }
         await vscode.workspace.applyEdit(buildEdit(editor.document.uri, editor.document, result, "insert"));
       } catch (err) {
