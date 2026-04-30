@@ -4,6 +4,13 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
+## [0.3.1] — 2026-04-30
+
+### Added
+- Extension icon for the VS Code Marketplace
+
+---
+
 ## [0.3.0] — 2026-04-30
 
 ### Added
