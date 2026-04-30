@@ -121,6 +121,59 @@ type TranslationResult = {
   infoByLine: Map<number, LineInfo>;
 };
 
+// Expands a range to fully cover any multi-line block comments it touches.
+// If the range starts mid-block, the start is pulled back to the opening line.
+// If the range ends mid-block, the end is pushed forward to the closing line.
+function expandRangeForBlocks(
+  doc: vscode.TextDocument,
+  range: vscode.Range,
+  blockSyntax: { open: string; close: string }
+): vscode.Range {
+  let startLine = range.start.line;
+  let endLine = range.end.line;
+
+  // Scan backwards to find if startLine is inside a block comment
+  for (let i = startLine - 1; i >= 0; i--) {
+    const line = doc.lineAt(i).text;
+    const lastOpen = line.lastIndexOf(blockSyntax.open);
+    const lastClose = line.lastIndexOf(blockSyntax.close);
+    if (lastClose !== -1 && (lastOpen === -1 || lastClose > lastOpen)) {
+      break; // found a close — outside any block
+    }
+    if (lastOpen !== -1 && (lastClose === -1 || lastOpen > lastClose)) {
+      startLine = i; // expand start to the opening line
+      break;
+    }
+  }
+
+  // Simulate block state from startLine to endLine to see if we end mid-block
+  let inBlock = false;
+  for (let i = startLine; i <= endLine; i++) {
+    const line = doc.lineAt(i).text;
+    if (inBlock) {
+      if (line.indexOf(blockSyntax.close) !== -1) { inBlock = false; }
+    } else {
+      const openIdx = line.indexOf(blockSyntax.open);
+      if (openIdx !== -1 && line.indexOf(blockSyntax.close, openIdx + blockSyntax.open.length) === -1) {
+        inBlock = true;
+      }
+    }
+  }
+
+  // If still inside a block at the end, scan forward to find the closing line
+  if (inBlock) {
+    for (let i = endLine + 1; i < doc.lineCount; i++) {
+      if (doc.lineAt(i).text.indexOf(blockSyntax.close) !== -1) {
+        endLine = i;
+        break;
+      }
+    }
+  }
+
+  if (startLine === range.start.line && endLine === range.end.line) { return range; }
+  return new vscode.Range(startLine, 0, endLine, doc.lineAt(endLine).text.length);
+}
+
 // Extracts comments from the given range of a document and sends them to Ollama.
 // Returns translated lines (already-English lines filtered out) plus per-line
 // metadata. Returns null if there is nothing to translate.
@@ -133,6 +186,9 @@ async function getTranslations(
   const blockSyntax = BLOCK_COMMENT_SYNTAX[languageId];
   let inBlock = false;
   let blockClose = "";
+
+  // Expand the range to fully cover any block comments it partially touches
+  if (blockSyntax) { range = expandRangeForBlocks(doc, range, blockSyntax); }
 
   for (let i = range.start.line; i <= range.end.line; i++) {
     const rawLine = doc.lineAt(i).text;
