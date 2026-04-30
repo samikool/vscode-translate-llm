@@ -14,11 +14,26 @@ const COMMENT_PREFIXES: Record<string, string[]> = {
   clojure: [";"], lisp: [";"],
 };
 
+// Block comment open/close delimiters for languages that support them
+const BLOCK_COMMENT_SYNTAX: Record<string, { open: string; close: string }> = {
+  javascript: { open: "/*", close: "*/" }, typescript: { open: "/*", close: "*/" },
+  javascriptreact: { open: "/*", close: "*/" }, typescriptreact: { open: "/*", close: "*/" },
+  java: { open: "/*", close: "*/" }, c: { open: "/*", close: "*/" },
+  cpp: { open: "/*", close: "*/" }, csharp: { open: "/*", close: "*/" },
+  go: { open: "/*", close: "*/" }, rust: { open: "/*", close: "*/" },
+  swift: { open: "/*", close: "*/" }, kotlin: { open: "/*", close: "*/" },
+  dart: { open: "/*", close: "*/" }, groovy: { open: "/*", close: "*/" },
+  sql: { open: "/*", close: "*/" }, css: { open: "/*", close: "*/" },
+  scss: { open: "/*", close: "*/" }, less: { open: "/*", close: "*/" },
+  html: { open: "<!--", close: "-->" }, xml: { open: "<!--", close: "-->" },
+};
+
 // File extensions that map to a known language with comment syntax
 const KNOWN_EXTENSIONS = new Set([
   "js", "ts", "jsx", "tsx", "java", "c", "cpp", "cc", "cs", "go",
   "rs", "swift", "kt", "dart", "groovy", "py", "rb", "sh", "yaml",
   "yml", "r", "pl", "coffee", "sql", "lua", "hs", "m", "tex", "clj", "lisp",
+  "css", "scss", "less", "html", "xml",
 ]);
 
 const FALLBACK_PREFIXES = ["//", "#", "--", "%", ";"];
@@ -42,19 +57,47 @@ interface CommentInfo {
   text: string;
   prefix: string;
   prefixStart: number;
+  // For block comments: the closing delimiter and its column position.
+  // For line comments: suffix is "" and suffixStart equals the line length.
+  suffix: string;
+  suffixStart: number;
 }
 
-// Returns the comment text (stripped of its marker) plus the prefix and its
-// position in the raw line. Returns null if the line contains no comment.
+// Returns the comment text (stripped of its marker) plus location metadata.
+// Handles single-line block comments (/* ... */) as well as line comments.
+// Returns null if the line contains no comment.
 function extractComment(line: string, languageId: string): CommentInfo | null {
+  const block = BLOCK_COMMENT_SYNTAX[languageId];
   const prefixes = COMMENT_PREFIXES[languageId] ?? FALLBACK_PREFIXES;
   const trimmed = line.trim();
+
+  // Single-line block comment: open and close both appear on this line.
+  if (block) {
+    const openIdx = line.indexOf(block.open);
+    if (openIdx !== -1) {
+      const closeIdx = line.indexOf(block.close, openIdx + block.open.length);
+      if (closeIdx !== -1) {
+        // Only treat as a block comment if no line-comment prefix comes before it.
+        const lineCommentFirst = prefixes.some((p) => {
+          const idx = findUnquotedIndex(line, p);
+          return idx !== -1 && idx < openIdx;
+        });
+        if (!lineCommentFirst) {
+          const text = line.slice(openIdx + block.open.length, closeIdx).trim();
+          if (text.length > 0) {
+            return { text, prefix: block.open, prefixStart: openIdx, suffix: block.close, suffixStart: closeIdx };
+          }
+          return null;
+        }
+      }
+    }
+  }
 
   // Full-line comment: trimmed line starts with a comment prefix
   for (const p of prefixes) {
     if (trimmed.startsWith(p)) {
       const prefixStart = line.indexOf(p);
-      return { text: trimmed.slice(p.length).trim(), prefix: p, prefixStart };
+      return { text: trimmed.slice(p.length).trim(), prefix: p, prefixStart, suffix: "", suffixStart: line.length };
     }
   }
 
@@ -62,7 +105,7 @@ function extractComment(line: string, languageId: string): CommentInfo | null {
   for (const p of prefixes) {
     const idx = findUnquotedIndex(line, p);
     if (idx !== -1) {
-      return { text: line.slice(idx + p.length).trim(), prefix: p, prefixStart: idx };
+      return { text: line.slice(idx + p.length).trim(), prefix: p, prefixStart: idx, suffix: "", suffixStart: line.length };
     }
   }
 
@@ -87,8 +130,52 @@ async function getTranslations(
 ): Promise<TranslationResult | null> {
   const languageId = doc.languageId;
   const lines: LineInfo[] = [];
+  const blockSyntax = BLOCK_COMMENT_SYNTAX[languageId];
+  let inBlock = false;
+  let blockClose = "";
+
   for (let i = range.start.line; i <= range.end.line; i++) {
-    const info = extractComment(doc.lineAt(i).text, languageId);
+    const rawLine = doc.lineAt(i).text;
+
+    if (inBlock) {
+      const closeIdx = rawLine.indexOf(blockClose);
+      if (closeIdx !== -1) {
+        inBlock = false;
+        // Content on the closing line, before the closing delimiter
+        const prefixMatch = rawLine.match(/^(\s*\*?)/);
+        const prefixStr = prefixMatch?.[1] ?? "";
+        const text = rawLine.slice(prefixStr.length, closeIdx).trim();
+        if (text.length > 0) {
+          lines.push({ line: i, text, prefix: prefixStr, prefixStart: 0, suffix: blockClose, suffixStart: closeIdx });
+        }
+      } else {
+        // Interior line: strip leading whitespace + optional * marker
+        const prefixMatch = rawLine.match(/^(\s*\*?)/);
+        const prefixStr = prefixMatch?.[1] ?? "";
+        const text = rawLine.slice(prefixStr.length).trim();
+        if (text.length > 0) {
+          lines.push({ line: i, text, prefix: prefixStr, prefixStart: 0, suffix: "", suffixStart: rawLine.length });
+        }
+      }
+      continue;
+    }
+
+    // Check for the start of a multi-line block comment (no close on the same line)
+    if (blockSyntax) {
+      const openIdx = rawLine.indexOf(blockSyntax.open);
+      if (openIdx !== -1 && rawLine.indexOf(blockSyntax.close, openIdx + blockSyntax.open.length) === -1) {
+        inBlock = true;
+        blockClose = blockSyntax.close;
+        const text = rawLine.slice(openIdx + blockSyntax.open.length).trim();
+        if (text.length > 0) {
+          lines.push({ line: i, text, prefix: blockSyntax.open, prefixStart: openIdx, suffix: "", suffixStart: rawLine.length });
+        }
+        continue;
+      }
+    }
+
+    // Single-line block comment or line comment
+    const info = extractComment(rawLine, languageId);
     if (info && info.text.length > 0) {
       lines.push({ line: i, ...info });
     }
@@ -125,10 +212,21 @@ function buildEdit(
     const info = result.infoByLine.get(t.line);
     if (!info) { continue; }
     const commentStart = info.prefixStart + info.prefix.length;
-    const range = new vscode.Range(t.line, commentStart, t.line, doc.lineAt(t.line).text.length);
-    const replacement = mode === "replace"
-      ? ` ${t.text}`
-      : ` ${t.text} ${info.prefix} ${info.text}`;
+    // For block comments: replace only up to the closing delimiter so it is preserved.
+    // For line comments: suffix is "" and suffixStart equals line length (same as before).
+    const contentEnd = info.suffix ? info.suffixStart : doc.lineAt(t.line).text.length;
+    const range = new vscode.Range(t.line, commentStart, t.line, contentEnd);
+    let replacement: string;
+    if (mode === "replace") {
+      // Add a trailing space before */ so the result is /* translation */ not /* translation*/
+      replacement = info.suffix ? ` ${t.text} ` : ` ${t.text}`;
+    } else {
+      // For block comments, nesting /* */ markers is not valid C/CSS syntax, so
+      // keep the original as a parenthetical rather than re-using the prefix.
+      replacement = info.suffix
+        ? ` ${t.text} (${info.text}) `
+        : ` ${t.text} ${info.prefix} ${info.text}`;
+    }
     edit.replace(uri, range, replacement);
   }
   return edit;
