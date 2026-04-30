@@ -100,6 +100,11 @@
           "type": "string",
           "default": "#4EC9B0",
           "description": "Color of the translation overlay text (hex value, e.g. #4EC9B0)"
+        },
+        "vstranslate.ollamaTimeout": {
+          "type": "number",
+          "default": 30,
+          "description": "Timeout in seconds for Ollama API requests. Set to -1 for no timeout."
         }
       }
     },
