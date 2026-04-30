@@ -4,7 +4,7 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-04-30
 
 ### Added
 - Block comment support: single-line `/* */`, multi-line `/* ... */`, and HTML `<!-- -->` comments are now detected and translated
