@@ -47,6 +47,11 @@
         "command": "vstranslate.clearOverlay",
         "title": "Clear Translation Overlay",
         "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.selectModel",
+        "title": "Select Ollama Model",
+        "category": "VSTranslate"
       }
     ],
     "menus": {
