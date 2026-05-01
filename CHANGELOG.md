@@ -4,6 +4,13 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
+## [0.3.3] — 2026-05-01
+
+### Fixed
+- Extension icon now correctly packaged in CI by enabling git LFS fetch during checkout
+
+---
+
 ## [0.3.2] — 2026-04-30
 
 ### Fixed
