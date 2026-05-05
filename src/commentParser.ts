@@ -3,11 +3,17 @@ export const COMMENT_PREFIXES: Record<string, string[]> = {
   typescriptreact: ["//"], java: ["//"], c: ["//"], cpp: ["//"],
   csharp: ["//"], go: ["//"], rust: ["//"], swift: ["//"],
   kotlin: ["//"], dart: ["//"], groovy: ["//"],
+  scala: ["//"], zig: ["//"], fsharp: ["//"],
+  php: ["//", "#"], elixir: ["#"], julia: ["#"],
+  powershell: ["#"],
   python: ["#"], ruby: ["#"], shellscript: ["#"], yaml: ["#"],
   r: ["#"], perl: ["#"], coffeescript: ["#"],
   sql: ["--"], lua: ["--"], haskell: ["--"],
+  vhdl: ["--"], ada: ["--"], erlang: ["%"],
   matlab: ["%"], latex: ["%"],
   clojure: [";"], lisp: [";"],
+  verilog: ["//"], systemverilog: ["//"],
+  ocaml: [],
 };
 
 // Block comment open/close delimiters for languages that support them
@@ -19,6 +25,10 @@ export const BLOCK_COMMENT_SYNTAX: Record<string, { open: string; close: string 
   go: { open: "/*", close: "*/" }, rust: { open: "/*", close: "*/" },
   swift: { open: "/*", close: "*/" }, kotlin: { open: "/*", close: "*/" },
   dart: { open: "/*", close: "*/" }, groovy: { open: "/*", close: "*/" },
+  scala: { open: "/*", close: "*/" }, php: { open: "/*", close: "*/" },
+  verilog: { open: "/*", close: "*/" }, systemverilog: { open: "/*", close: "*/" },
+  zig: { open: "/*", close: "*/" }, fsharp: { open: "(*", close: "*)" },
+  ocaml: { open: "(*", close: "*)" },
   sql: { open: "/*", close: "*/" }, css: { open: "/*", close: "*/" },
   scss: { open: "/*", close: "*/" }, less: { open: "/*", close: "*/" },
   html: { open: "<!--", close: "-->" }, xml: { open: "<!--", close: "-->" },

@@ -10,10 +10,30 @@ import {
 
 // File extensions that map to a known language with comment syntax
 const KNOWN_EXTENSIONS = new Set([
-  "js", "ts", "jsx", "tsx", "java", "c", "cpp", "cc", "cs", "go",
-  "rs", "swift", "kt", "dart", "groovy", "py", "rb", "sh", "yaml",
-  "yml", "r", "pl", "coffee", "sql", "lua", "hs", "m", "tex", "clj", "lisp",
-  "css", "scss", "less", "html", "xml",
+  // JavaScript / TypeScript
+  "js", "ts", "jsx", "tsx",
+  // JVM
+  "java", "kt", "kts", "groovy", "scala",
+  // C family
+  "c", "h", "cpp", "cc", "cxx", "inl", "hpp", "hh", "hxx", "cs",
+  // Systems / low-level
+  "go", "rs", "zig",
+  // Mobile / cross-platform
+  "swift", "dart",
+  // Scripting
+  "py", "pyi", "rb", "sh", "bash", "zsh", "pl", "pm", "coffee",
+  "php", "lua", "r",
+  // Functional
+  "hs", "lhs", "clj", "cljs", "cljc", "lisp", "ml", "mli", "fs", "fsi",
+  "ex", "exs", "erl", "hrl",
+  // Data / config / markup
+  "sql", "yaml", "yml", "css", "scss", "less", "html", "htm", "xml",
+  // Scientific / academic
+  "m", "tex", "jl",
+  // Shell-adjacent
+  "ps1", "psm1",
+  // Hardware description
+  "v", "sv", "vhd", "vhdl",
 ]);
 
 interface LineInfo extends CommentInfo {
