@@ -30,9 +30,9 @@ fn main() {
     let average = total as f64 / numbers.len() as f64; // 平均値を計算する
 
     /* ------ 結果を出力する ------ */
-    println!("Numbers: {:?}", numbers);
-    println!("Sum:     {}", total);
-    println!("Average: {:.2}", average);
-    println!("Min:     {}", minimum(&numbers));
-    println!("Max:     {}", maximum(&numbers));
+    println!("数値:   {:?}", numbers);
+    println!("合計:   {}", total);
+    println!("平均:   {:.2}", average);
+    println!("最小値: {}", minimum(&numbers));
+    println!("最大値: {}", maximum(&numbers));
 }

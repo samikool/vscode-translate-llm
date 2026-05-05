@@ -16,8 +16,8 @@ const maximum: number = Math.max(...numbers); // Наибольшее значе
  * Все значения отформатированы для удобства чтения.
  */
 /* ------ Вывод результатов ------ */
-console.log(`Numbers: ${numbers}`);
-console.log(`Sum:     ${total}`);
-console.log(`Average: ${average.toFixed(2)}`);
-console.log(`Min:     ${minimum}`);
-console.log(`Max:     ${maximum}`);
+console.log(`Числа:       ${numbers}`);
+console.log(`Сумма:       ${total}`);
+console.log(`Среднее:     ${average.toFixed(2)}`);
+console.log(`Минимум:     ${minimum}`);
+console.log(`Максимум:    ${maximum}`);

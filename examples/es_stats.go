@@ -49,9 +49,9 @@ func main() {
 	average := float64(total) / float64(len(numbers)) // Calcular el promedio
 
 	/* ------ Imprimir los resultados ------ */
-	fmt.Printf("Numbers: %v\n",   numbers)
-	fmt.Printf("Sum:     %d\n",   total)
-	fmt.Printf("Average: %.2f\n", average)
-	fmt.Printf("Min:     %d\n",   minimum(numbers))
-	fmt.Printf("Max:     %d\n",   maximum(numbers))
+	fmt.Printf("Números:  %v\n",   numbers)
+	fmt.Printf("Suma:     %d\n",   total)
+	fmt.Printf("Promedio: %.2f\n", average)
+	fmt.Printf("Mínimo:   %d\n",   minimum(numbers))
+	fmt.Printf("Máximo:   %d\n",   maximum(numbers))
 }

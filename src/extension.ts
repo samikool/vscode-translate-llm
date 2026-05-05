@@ -7,6 +7,7 @@ import {
   extractComment,
   expandRangeForBlocks,
 } from "./commentParser";
+import { extractStrings, StringInfo } from "./stringParser";
 
 // File extensions that map to a known language with comment syntax
 const KNOWN_EXTENSIONS = new Set([
@@ -130,6 +131,100 @@ async function getTranslations(
 
   if (translations.length === 0) { return null; }
   return { translations, infoByLine: new Map(lines.map((l) => [l.line, l])) };
+}
+
+// ---------------------------------------------------------------------------
+// String translation pipeline (separate from comments)
+// ---------------------------------------------------------------------------
+
+interface StringEntry {
+  id: number;
+  line: number;
+  info: StringInfo;
+}
+
+interface StringTranslationResult {
+  entries: StringEntry[];
+  translated: Map<number, string>; // id -> translated text
+}
+
+async function getStringTranslations(
+  doc: vscode.TextDocument,
+  range: vscode.Range
+): Promise<StringTranslationResult | null> {
+  const languageId = doc.languageId;
+  const entries: StringEntry[] = [];
+  let id = 0;
+
+  for (let i = range.start.line; i <= range.end.line; i++) {
+    for (const info of extractStrings(doc.lineAt(i).text, languageId)) {
+      entries.push({ id: id++, line: i, info });
+    }
+  }
+
+  if (entries.length === 0) { return null; }
+
+  const translated = new Map<number, string>();
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: "VSTranslate", cancellable: false },
+    async (progress) => {
+      progress.report({ message: "Translating strings…" });
+      const payload = entries.map((e) => ({ line: e.id, text: e.info.text }));
+      const raw = await translateWithOllama(payload);
+      const entryById = new Map(entries.map((e) => [e.id, e]));
+      for (const t of raw) {
+        const entry = entryById.get(t.line);
+        if (entry && t.text.toLowerCase() !== entry.info.text.toLowerCase()) {
+          translated.set(t.line, t.text);
+        }
+      }
+    }
+  );
+
+  if (translated.size === 0) { return null; }
+  return { entries, translated };
+}
+
+// Builds a WorkspaceEdit that replaces string content (not the quotes) in-place.
+// Replacements within each line are applied right-to-left to preserve offsets.
+function buildStringEdit(
+  uri: vscode.Uri,
+  result: StringTranslationResult
+): vscode.WorkspaceEdit {
+  const edit = new vscode.WorkspaceEdit();
+  const entryById = new Map(result.entries.map((e) => [e.id, e]));
+  const byLine = new Map<number, { info: StringInfo; translation: string }[]>();
+  for (const [id, translation] of result.translated) {
+    const entry = entryById.get(id);
+    if (!entry) { continue; }
+    const arr = byLine.get(entry.line) ?? [];
+    arr.push({ info: entry.info, translation });
+    byLine.set(entry.line, arr);
+  }
+  for (const [line, replacements] of byLine) {
+    replacements.sort((a, b) => b.info.start - a.info.start); // right-to-left
+    for (const { info, translation } of replacements) {
+      const range = new vscode.Range(line, info.start + 1, line, info.end);
+      edit.replace(uri, range, translation);
+    }
+  }
+  return edit;
+}
+
+// Builds the overlay lines for the string overlay command.
+// Multiple strings on the same source line are joined with " | ".
+function buildStringOverlay(result: StringTranslationResult): { line: number; text: string }[] {
+  const entryById = new Map(result.entries.map((e) => [e.id, e]));
+  const byLine = new Map<number, string[]>();
+  for (const [id, translation] of result.translated) {
+    const entry = entryById.get(id);
+    if (!entry) { continue; }
+    const q = entry.info.quoteChar;
+    const arr = byLine.get(entry.line) ?? [];
+    arr.push(`${q}${translation}${q}`);
+    byLine.set(entry.line, arr);
+  }
+  return [...byLine.entries()].map(([line, texts]) => ({ line, text: texts.join(" | ") }));
 }
 
 // Builds a WorkspaceEdit for a single document given translation results and mode.
@@ -356,6 +451,151 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  // Command: translate all strings in the current file (replace in-place)
+  const translateStringsFileCommand = vscode.commands.registerCommand(
+    "vstranslate.translateStringsFile",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        "This will replace all string values in the file. Program behavior may change. Continue?",
+        { modal: true },
+        "Replace"
+      );
+      if (confirmed !== "Replace") { return; }
+
+      try {
+        const doc = editor.document;
+        const originalText = doc.getText();
+        const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+        const result = await getStringTranslations(doc, fileRange);
+        if (!result) { return; }
+        await vscode.workspace.applyEdit(buildStringEdit(doc.uri, result));
+        showUndoNotification("Strings translated. Undo?", new Map([[doc.uri, originalText]]));
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  );
+
+  // Command: translate all strings in the workspace (replace in-place)
+  const translateStringsWorkspaceCommand = vscode.commands.registerCommand(
+    "vstranslate.translateStringsWorkspace",
+    async () => {
+      const confirmed = await vscode.window.showWarningMessage(
+        "This will replace string values in all recognized source files. Program behavior may change. Continue?",
+        { modal: true },
+        "Replace"
+      );
+      if (confirmed !== "Replace") { return; }
+
+      const uris = await vscode.workspace.findFiles(
+        "**/*",
+        "{**/node_modules/**,**/dist/**,**/out/**,**/.git/**}"
+      );
+      const filtered = uris.filter((uri) => {
+        const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
+        return KNOWN_EXTENSIONS.has(ext);
+      });
+
+      if (filtered.length === 0) {
+        vscode.window.showInformationMessage("VSTranslate: No recognized source files found in workspace.");
+        return;
+      }
+
+      const originals = new Map<vscode.Uri, string>();
+      let failedFile: string | undefined;
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "VSTranslate: Translating workspace strings",
+          cancellable: true,
+        },
+        async (progress, token) => {
+          for (let i = 0; i < filtered.length; i++) {
+            if (token.isCancellationRequested) { break; }
+
+            const uri = filtered[i];
+            const fileName = uri.fsPath.split(/[\\/]/).pop() ?? uri.fsPath;
+            progress.report({ message: `${fileName} (${i + 1} of ${filtered.length})`, increment: (1 / filtered.length) * 100 });
+
+            try {
+              const doc = await vscode.workspace.openTextDocument(uri);
+              const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+              const result = await getStringTranslations(doc, fileRange);
+              if (!result) { continue; }
+
+              const originalText = doc.getText();
+              await vscode.workspace.applyEdit(buildStringEdit(uri, result));
+              originals.set(uri, originalText);
+            } catch {
+              failedFile = fileName;
+              break;
+            }
+          }
+        }
+      );
+
+      if (failedFile) {
+        vscode.window.showErrorMessage(`VSTranslate: Failed on "${failedFile}".`);
+        if (originals.size > 0) {
+          showUndoNotification(
+            `${originals.size} file(s) were modified before the failure. Undo?`,
+            originals
+          );
+        }
+      } else if (originals.size > 0) {
+        showUndoNotification(`Translated strings in ${originals.size} file(s). Undo?`, originals);
+      } else {
+        vscode.window.showInformationMessage("VSTranslate: No non-English strings found in workspace.");
+      }
+    }
+  );
+
+  // Command: overlay string translations (non-destructive)
+  const translateStringsCommand = vscode.commands.registerCommand(
+    "vstranslate.translateStrings",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+
+      try {
+        const result = await getStringTranslations(editor.document, getEffectiveRange(editor));
+        if (result) {
+          overlayManager.showTranslation(editor, buildStringOverlay(result));
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  );
+
+  // Command: replace string content with translation (destructive — requires confirmation)
+  const replaceStringsCommand = vscode.commands.registerCommand(
+    "vstranslate.replaceStrings",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        "Replacing string values may change program behavior. Continue?",
+        { modal: true },
+        "Replace"
+      );
+      if (confirmed !== "Replace") { return; }
+
+      try {
+        const result = await getStringTranslations(editor.document, getEffectiveRange(editor));
+        if (!result) { return; }
+        await vscode.workspace.applyEdit(buildStringEdit(editor.document.uri, result));
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  );
+
   const clearCommand = vscode.commands.registerCommand(
     "vstranslate.clearOverlay",
     () => { overlayManager.clear(); }
@@ -409,6 +649,10 @@ export function activate(context: vscode.ExtensionContext): void {
     insertCommand,
     translateFileCommand,
     translateWorkspaceCommand,
+    translateStringsFileCommand,
+    translateStringsWorkspaceCommand,
+    translateStringsCommand,
+    replaceStringsCommand,
     clearCommand,
     selectModelCommand,
     selectionChangeListener,

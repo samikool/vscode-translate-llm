@@ -42,10 +42,10 @@ int main() {
     int n = MAX_NUMBERS;
 
     /* ------ 输出结果 ------ */
-    printf("Numbers: {4, 8, 15, 16, 23, 42}\n");
-    printf("Sum:     %d\n",   sum(numbers, n));     /* 输出总和 */
-    printf("Min:     %d\n",   minimum(numbers, n)); /* 输出最小值 */
-    printf("Max:     %d\n",   maximum(numbers, n)); /* 输出最大值 */
+    printf("数字: {4, 8, 15, 16, 23, 42}\n");
+    printf("总和: %d\n",   sum(numbers, n));     /* 输出总和 */
+    printf("最小: %d\n",   minimum(numbers, n)); /* 输出最小值 */
+    printf("最大: %d\n",   maximum(numbers, n)); /* 输出最大值 */
 
     return 0; /* 程序成功结束 */
 }

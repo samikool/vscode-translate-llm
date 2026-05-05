@@ -47,10 +47,10 @@ public class fr_stats {
         /*
          * Les résultats sont formatés pour la lisibilité.
          */
-        System.out.println("Numbers: [4, 8, 15, 16, 23, 42]");
-        System.out.printf("Sum:     %d%n",   total);
-        System.out.printf("Average: %.2f%n", average);
-        System.out.printf("Min:     %.0f%n", min);
-        System.out.printf("Max:     %.0f%n", max);
+        System.out.println("Nombres: [4, 8, 15, 16, 23, 42]");
+        System.out.printf("Somme:   %d%n",   total);
+        System.out.printf("Moyenne: %.2f%n", average);
+        System.out.printf("Valeur minimale: %.0f%n", min);
+        System.out.printf("Valeur maximale: %.0f%n", max);
     }
 }

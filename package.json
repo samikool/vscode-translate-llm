@@ -45,6 +45,26 @@
         "category": "VSTranslate"
       },
       {
+        "command": "vstranslate.translateStrings",
+        "title": "Show Translated Strings",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.replaceStrings",
+        "title": "Replace Strings with Translation",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.translateStringsFile",
+        "title": "Translate Strings in File",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.translateStringsWorkspace",
+        "title": "Translate Strings in Workspace",
+        "category": "VSTranslate"
+      },
+      {
         "command": "vstranslate.clearOverlay",
         "title": "Clear Translation Overlay",
         "category": "VSTranslate"
@@ -81,6 +101,26 @@
           "command": "vstranslate.translateWorkspace",
           "when": "editorIsOpen",
           "group": "vstranslate@5"
+        },
+        {
+          "command": "vstranslate.translateStrings",
+          "when": "editorTextFocus",
+          "group": "vstranslate@6"
+        },
+        {
+          "command": "vstranslate.replaceStrings",
+          "when": "editorTextFocus",
+          "group": "vstranslate@7"
+        },
+        {
+          "command": "vstranslate.translateStringsFile",
+          "when": "editorIsOpen",
+          "group": "vstranslate@8"
+        },
+        {
+          "command": "vstranslate.translateStringsWorkspace",
+          "when": "editorIsOpen",
+          "group": "vstranslate@9"
         }
       ]
     },

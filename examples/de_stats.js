@@ -16,8 +16,8 @@ const maximum = Math.max(...numbers); // Größten Wert finden
  * Alle Werte werden formatiert dargestellt.
  */
 /* ------ Ergebnisse ausgeben ------ */
-console.log(`Numbers: ${numbers}`);
-console.log(`Sum:     ${total}`);
-console.log(`Average: ${average.toFixed(2)}`);
-console.log(`Min:     ${minimum}`);
-console.log(`Max:     ${maximum}`);
+console.log(`Zahlen:       ${numbers}`);
+console.log(`Summe:        ${total}`);
+console.log(`Durchschnitt: ${average.toFixed(2)}`);
+console.log(`Minimum:      ${minimum}`);
+console.log(`Maximum:      ${maximum}`);

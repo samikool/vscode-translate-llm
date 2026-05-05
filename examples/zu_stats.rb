@@ -12,8 +12,8 @@ minimum = numbers.min # Thola inani elincane kuluhlu
 maximum = numbers.max # Thola inani elikhulu kuluhlu
 
 # Shicilela imiphumela
-puts "Numbers: #{numbers}"
-puts "Sum:     #{total}"
-puts "Average: #{format('%.2f', average)}"
-puts "Min:     #{minimum}"
-puts "Max:     #{maximum}"
+puts "Izinombolo: #{numbers}"
+puts "Isamba:     #{total}"
+puts "Uphakathi:  #{format('%.2f', average)}"
+puts "Elincane:   #{minimum}"
+puts "Elikhulu:   #{maximum}"
