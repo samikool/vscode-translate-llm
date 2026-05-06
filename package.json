@@ -65,6 +65,16 @@
         "category": "VSTranslate"
       },
       {
+        "command": "vstranslate.explorerTranslateComments",
+        "title": "Translate Comments",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.explorerTranslateStrings",
+        "title": "Translate Strings",
+        "category": "VSTranslate"
+      },
+      {
         "command": "vstranslate.clearOverlay",
         "title": "Clear Translation Overlay",
         "category": "VSTranslate"
@@ -121,6 +131,18 @@
           "command": "vstranslate.translateStringsWorkspace",
           "when": "editorIsOpen",
           "group": "vstranslate@9"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "vstranslate.explorerTranslateComments",
+          "when": "resourceScheme == 'file'",
+          "group": "vstranslate@1"
+        },
+        {
+          "command": "vstranslate.explorerTranslateStrings",
+          "when": "resourceScheme == 'file'",
+          "group": "vstranslate@2"
         }
       ]
     },

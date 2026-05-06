@@ -274,6 +274,32 @@ function showUndoNotification(message: string, originals: Map<vscode.Uri, string
   });
 }
 
+const IGNORED_DIRS = new Set(["node_modules", "dist", "out", ".git", ".svn", ".hg", ".next", "build"]);
+
+// Recursively collects all file URIs under the given URI.
+// If the URI is a file, returns [uri]. If a directory, recurses into it (skipping IGNORED_DIRS).
+async function collectFiles(uri: vscode.Uri): Promise<vscode.Uri[]> {
+  const stat = await vscode.workspace.fs.stat(uri);
+  if (stat.type === vscode.FileType.File) {
+    return [uri];
+  }
+  if (stat.type === vscode.FileType.Directory) {
+    const entries = await vscode.workspace.fs.readDirectory(uri);
+    const results: vscode.Uri[] = [];
+    for (const [name, type] of entries) {
+      if (name.startsWith(".") || IGNORED_DIRS.has(name)) { continue; }
+      const child = vscode.Uri.joinPath(uri, name);
+      if (type === vscode.FileType.Directory) {
+        results.push(...await collectFiles(child));
+      } else if (type === vscode.FileType.File) {
+        results.push(child);
+      }
+    }
+    return results;
+  }
+  return [];
+}
+
 // Returns the selection if non-empty, otherwise a range covering just the cursor line.
 function getEffectiveRange(editor: vscode.TextEditor): vscode.Range {
   if (!editor.selection.isEmpty) { return editor.selection; }
@@ -596,6 +622,136 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  // Explorer command: translate comments in selected files/folders
+  const explorerTranslateCommentsCommand = vscode.commands.registerCommand(
+    "vstranslate.explorerTranslateComments",
+    async (clickedUri: vscode.Uri, selectedUris: vscode.Uri[]) => {
+      const roots = selectedUris?.length > 0 ? selectedUris : [clickedUri];
+
+      const allFiles = (await Promise.all(roots.map(collectFiles))).flat();
+      const filtered = allFiles.filter((uri) => {
+        const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
+        return KNOWN_EXTENSIONS.has(ext);
+      });
+
+      if (filtered.length === 0) {
+        vscode.window.showErrorMessage("VSTranslate: None of the selected files have a recognized source file extension.");
+        return;
+      }
+
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "Replace Comments with Translation", mode: "replace" as const },
+          { label: "Insert Translated Comments", mode: "insert" as const },
+        ],
+        { placeHolder: "How should the translations be applied?" }
+      );
+      if (!pick) { return; }
+
+      const originals = new Map<vscode.Uri, string>();
+      let failedFile: string | undefined;
+
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "VSTranslate: Translating comments", cancellable: true },
+        async (progress, token) => {
+          for (let i = 0; i < filtered.length; i++) {
+            if (token.isCancellationRequested) { break; }
+            const uri = filtered[i];
+            const fileName = uri.fsPath.split(/[\\/]/).pop() ?? uri.fsPath;
+            progress.report({ message: `${fileName} (${i + 1} of ${filtered.length})`, increment: (1 / filtered.length) * 100 });
+            try {
+              const doc = await vscode.workspace.openTextDocument(uri);
+              const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+              const result = await getTranslations(doc, fileRange);
+              if (!result) { continue; }
+              const originalText = doc.getText();
+              await vscode.workspace.applyEdit(buildEdit(uri, doc, result, pick.mode));
+              originals.set(uri, originalText);
+            } catch {
+              failedFile = fileName;
+              break;
+            }
+          }
+        }
+      );
+
+      if (failedFile) {
+        vscode.window.showErrorMessage(`VSTranslate: Failed on "${failedFile}".`);
+        if (originals.size > 0) {
+          showUndoNotification(`${originals.size} file(s) were modified before the failure. Undo?`, originals);
+        }
+      } else if (originals.size > 0) {
+        showUndoNotification(`Translated ${originals.size} file(s). Undo?`, originals);
+      } else {
+        vscode.window.showInformationMessage("VSTranslate: No non-English comments found in the selected files.");
+      }
+    }
+  );
+
+  // Explorer command: translate strings in selected files/folders
+  const explorerTranslateStringsCommand = vscode.commands.registerCommand(
+    "vstranslate.explorerTranslateStrings",
+    async (clickedUri: vscode.Uri, selectedUris: vscode.Uri[]) => {
+      const roots = selectedUris?.length > 0 ? selectedUris : [clickedUri];
+
+      const allFiles = (await Promise.all(roots.map(collectFiles))).flat();
+      const filtered = allFiles.filter((uri) => {
+        const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
+        return KNOWN_EXTENSIONS.has(ext);
+      });
+
+      if (filtered.length === 0) {
+        vscode.window.showErrorMessage("VSTranslate: None of the selected files have a recognized source file extension.");
+        return;
+      }
+
+      const confirmed = await vscode.window.showWarningMessage(
+        `This will replace string values in ${filtered.length} file(s). Program behavior may change. Continue?`,
+        { modal: true },
+        "Replace"
+      );
+      if (confirmed !== "Replace") { return; }
+
+      const originals = new Map<vscode.Uri, string>();
+      let failedFile: string | undefined;
+
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "VSTranslate: Translating strings", cancellable: true },
+        async (progress, token) => {
+          for (let i = 0; i < filtered.length; i++) {
+            if (token.isCancellationRequested) { break; }
+            const uri = filtered[i];
+            const fileName = uri.fsPath.split(/[\\/]/).pop() ?? uri.fsPath;
+            progress.report({ message: `${fileName} (${i + 1} of ${filtered.length})`, increment: (1 / filtered.length) * 100 });
+            try {
+              const doc = await vscode.workspace.openTextDocument(uri);
+              const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+              const result = await getStringTranslations(doc, fileRange);
+              if (!result) { continue; }
+              const originalText = doc.getText();
+              await vscode.workspace.applyEdit(buildStringEdit(uri, result));
+              originals.set(uri, originalText);
+            } catch {
+              failedFile = fileName;
+              break;
+            }
+          }
+        }
+      );
+
+      if (failedFile) {
+        vscode.window.showErrorMessage(`VSTranslate: Failed on "${failedFile}".`);
+        if (originals.size > 0) {
+          showUndoNotification(`${originals.size} file(s) were modified before the failure. Undo?`, originals);
+        }
+      } else if (originals.size > 0) {
+        showUndoNotification(`Translated strings in ${originals.size} file(s). Undo?`, originals);
+      } else {
+        vscode.window.showInformationMessage("VSTranslate: No non-English strings found in the selected files.");
+      }
+    }
+  );
+
   const clearCommand = vscode.commands.registerCommand(
     "vstranslate.clearOverlay",
     () => { overlayManager.clear(); }
@@ -653,6 +809,8 @@ export function activate(context: vscode.ExtensionContext): void {
     translateStringsWorkspaceCommand,
     translateStringsCommand,
     replaceStringsCommand,
+    explorerTranslateCommentsCommand,
+    explorerTranslateStringsCommand,
     clearCommand,
     selectModelCommand,
     selectionChangeListener,
