@@ -385,6 +385,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = await getTranslations(doc, fileRange);
         if (!result) { return; }
         await vscode.workspace.applyEdit(buildEdit(doc.uri, doc, result, pick.mode));
+        await doc.save();
         showUndoNotification("File translated. Undo?", new Map([[doc.uri, originalText]]));
       } catch (err) {
         vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
@@ -452,6 +453,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
               const originalText = doc.getText();
               await vscode.workspace.applyEdit(buildEdit(uri, doc, result, pick.mode));
+              await doc.save();
               originals.set(uri, originalText);
             } catch {
               failedFile = fileName;
@@ -498,6 +500,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = await getStringTranslations(doc, fileRange);
         if (!result) { return; }
         await vscode.workspace.applyEdit(buildStringEdit(doc.uri, result));
+        await doc.save();
         showUndoNotification("Strings translated. Undo?", new Map([[doc.uri, originalText]]));
       } catch (err) {
         vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
@@ -555,6 +558,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
               const originalText = doc.getText();
               await vscode.workspace.applyEdit(buildStringEdit(uri, result));
+              await doc.save();
               originals.set(uri, originalText);
             } catch {
               failedFile = fileName;
@@ -666,6 +670,7 @@ export function activate(context: vscode.ExtensionContext): void {
               if (!result) { continue; }
               const originalText = doc.getText();
               await vscode.workspace.applyEdit(buildEdit(uri, doc, result, pick.mode));
+              await doc.save();
               originals.set(uri, originalText);
             } catch {
               failedFile = fileName;
@@ -730,6 +735,7 @@ export function activate(context: vscode.ExtensionContext): void {
               if (!result) { continue; }
               const originalText = doc.getText();
               await vscode.workspace.applyEdit(buildStringEdit(uri, result));
+              await doc.save();
               originals.set(uri, originalText);
             } catch {
               failedFile = fileName;
