@@ -72,7 +72,7 @@ export async function getOllamaModels(): Promise<string[]> {
     req.on("error", (err) => reject(new Error(`Connection failed: ${err.message}`)));
     req.setTimeout(10000, () => {
       req.destroy();
-      reject(new Error("Request timed out after 10s"));
+      reject(new Error("Request timed out after 10s while fetching models."));
     });
 
     req.end();
@@ -151,7 +151,7 @@ export async function translateWithOllama(lines: { line: number; text: string }[
     if (config.timeoutMs > 0) {
       req.setTimeout(config.timeoutMs, () => {
         req.destroy();
-        reject(new Error(`Request timed out after ${config.timeoutMs / 1000}s`));
+        reject(new Error(`Request timed out after ${config.timeoutMs / 1000}s. You can increase this in Settings under "VSTranslate: Ollama Timeout", or set it to -1 to disable the timeout.`));
       });
     }
 
