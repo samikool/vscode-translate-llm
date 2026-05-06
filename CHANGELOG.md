@@ -4,6 +4,19 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
+## [0.4.0] — 2026-05-05
+
+### Added
+- Translate comments and strings from the Explorer context menu (right-click files/folders)
+- String literal translation pipeline
+- Expanded language and file extension support
+
+### Fixed
+- Files are now auto-saved after bulk translation, preventing unsaved tab buildup
+- Timeout error message now includes a hint to adjust the timeout setting
+
+---
+
 ## [0.3.3] — 2026-05-01
 
 ### Fixed
