@@ -796,6 +796,88 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  // Command: translate the exact highlighted text — no comment parsing, pure fallback
+  const translateRawCommand = vscode.commands.registerCommand(
+    "vstranslate.translateRaw",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+      if (editor.selection.isEmpty) { vscode.window.showErrorMessage("VSTranslate: No text selected."); return; }
+
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "Show Translation (Overlay)", mode: "overlay" as const },
+          { label: "Insert Translation Below", mode: "insert" as const },
+          { label: "Replace with Translation", mode: "replace" as const },
+        ],
+        { placeHolder: "How should the translation be applied?" }
+      );
+      if (!pick) { return; }
+
+      try {
+        const { document: doc, selection } = editor;
+        const lines: { line: number; text: string }[] = [];
+
+        for (let i = selection.start.line; i <= selection.end.line; i++) {
+          const full = doc.lineAt(i).text;
+          let text: string;
+          if (selection.start.line === selection.end.line) {
+            text = full.slice(selection.start.character, selection.end.character);
+          } else if (i === selection.start.line) {
+            text = full.slice(selection.start.character);
+          } else if (i === selection.end.line) {
+            text = full.slice(0, selection.end.character);
+          } else {
+            text = full;
+          }
+          if (text.trim().length > 0) {
+            lines.push({ line: i, text: text.trim() });
+          }
+        }
+
+        if (lines.length === 0) { return; }
+
+        let translations: { line: number; text: string }[] = [];
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: "VSTranslate", cancellable: false },
+          async (progress) => {
+            progress.report({ message: "Translating…" });
+            const origByLine = new Map(lines.map((l) => [l.line, l.text]));
+            const raw = await translateWithOllama(lines);
+            translations = raw.filter(
+              (t) => t.text.toLowerCase() !== (origByLine.get(t.line) ?? "").toLowerCase()
+            );
+          }
+        );
+
+        if (translations.length === 0) {
+          vscode.window.showInformationMessage("VSTranslate: Selection appears to already be in English.");
+          return;
+        }
+
+        if (pick.mode === "overlay") {
+          overlayManager.showTranslation(editor, translations);
+        } else if (pick.mode === "replace") {
+          const translatedText = translations.map((t) => t.text).join("\n");
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(doc.uri, selection, translatedText);
+          await vscode.workspace.applyEdit(edit);
+        } else {
+          // Insert translated lines as new lines directly after the selection,
+          // indented to match the first selected line.
+          const indent = doc.lineAt(selection.start.line).text.match(/^(\s*)/)?.[1] ?? "";
+          const insertText = translations.map((t) => `${indent}${t.text}`).join("\n") + "\n";
+          const insertPos = new vscode.Position(selection.end.line + 1, 0);
+          const edit = new vscode.WorkspaceEdit();
+          edit.insert(doc.uri, insertPos, insertText);
+          await vscode.workspace.applyEdit(edit);
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  );
+
   // Auto-clear overlay when the user moves the cursor or changes the selection
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     () => { overlayManager.clear(); }
@@ -815,6 +897,7 @@ export function activate(context: vscode.ExtensionContext): void {
     explorerTranslateStringsCommand,
     clearCommand,
     selectModelCommand,
+    translateRawCommand,
     selectionChangeListener,
     overlayManager
   );

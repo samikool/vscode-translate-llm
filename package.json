@@ -83,6 +83,11 @@
         "command": "vstranslate.selectModel",
         "title": "Select Ollama Model",
         "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.translateRaw",
+        "title": "Translate Selected Text",
+        "category": "VSTranslate"
       }
     ],
     "menus": {
@@ -131,6 +136,11 @@
           "command": "vstranslate.translateStringsWorkspace",
           "when": "editorIsOpen",
           "group": "vstranslate@9"
+        },
+        {
+          "command": "vstranslate.translateRaw",
+          "when": "editorHasSelection",
+          "group": "vstranslate@10"
         }
       ],
       "explorer/context": [
