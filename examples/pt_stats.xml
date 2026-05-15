@@ -1,0 +1,32 @@
+<!-- Arquivo de configuração de estatísticas de vendas -->
+<!-- Gerado automaticamente pelo sistema de relatórios -->
+
+<relatorio>
+  <!-- Período de análise: último trimestre -->
+  <periodo inicio="2024-01-01" fim="2024-03-31" />
+
+  <!-- Resumo geral das vendas por região -->
+  <regioes>
+    <!-- Região Norte: maior crescimento no trimestre -->
+    <regiao id="norte" nome="Norte">
+      <vendas total="152340" unidades="4821" />
+      <!-- Taxa de crescimento em relação ao trimestre anterior -->
+      <crescimento percentual="12.4" />
+    </regiao>
+
+    <!-- Região Sul: desempenho abaixo da meta -->
+    <regiao id="sul" nome="Sul">
+      <vendas total="98720" unidades="3104" />
+      <!-- Necessita de análise detalhada das causas -->
+      <crescimento percentual="-3.1" />
+    </regiao>
+  </regioes>
+
+  <!-- Produtos mais vendidos no período -->
+  <top_produtos limite="5">
+    <!-- Ordenados por receita total, não por volume de unidades -->
+    <produto rank="1" codigo="PRD-001" nome="Produto A" receita="45200" />
+    <produto rank="2" codigo="PRD-007" nome="Produto G" receita="38900" />
+    <produto rank="3" codigo="PRD-012" nome="Produto L" receita="29750" />
+  </top_produtos>
+</relatorio>

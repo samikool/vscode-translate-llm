@@ -2,39 +2,22 @@ import * as vscode from "vscode";
 import { translateWithOllama, getOllamaModels } from "./ollamaClient";
 import { OverlayManager } from "./overlayManager";
 import {
-  BLOCK_COMMENT_SYNTAX,
   CommentInfo,
   extractComment,
   expandRangeForBlocks,
 } from "./commentParser";
+import { getCommentSyntax } from "./languageConfig";
 import { extractStrings, StringInfo } from "./stringParser";
 
-// File extensions that map to a known language with comment syntax
-const KNOWN_EXTENSIONS = new Set([
-  // JavaScript / TypeScript
-  "js", "ts", "jsx", "tsx",
-  // JVM
-  "java", "kt", "kts", "groovy", "scala",
-  // C family
-  "c", "h", "cpp", "cc", "cxx", "inl", "hpp", "hh", "hxx", "cs",
-  // Systems / low-level
-  "go", "rs", "zig",
-  // Mobile / cross-platform
-  "swift", "dart",
-  // Scripting
-  "py", "pyi", "rb", "sh", "bash", "zsh", "pl", "pm", "coffee",
-  "php", "lua", "r",
-  // Functional
-  "hs", "lhs", "clj", "cljs", "cljc", "lisp", "ml", "mli", "fs", "fsi",
-  "ex", "exs", "erl", "hrl",
-  // Data / config / markup
-  "sql", "yaml", "yml", "css", "scss", "less", "html", "htm", "xml",
-  // Scientific / academic
-  "m", "tex", "jl",
-  // Shell-adjacent
-  "ps1", "psm1",
-  // Hardware description
-  "v", "sv", "vhd", "vhdl",
+// Binary file extensions to skip — everything else is fair game.
+const BINARY_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "tif", "avif",
+  "woff", "woff2", "ttf", "otf", "eot",
+  "zip", "tar", "gz", "bz2", "xz", "7z", "rar",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "exe", "dll", "so", "dylib", "bin", "o", "a", "lib", "node",
+  "mp3", "mp4", "wav", "ogg", "flac", "aac", "avi", "mov", "mkv", "webm",
+  "vsix", "wasm", "pyc", "class", "jar",
 ]);
 
 interface LineInfo extends CommentInfo {
@@ -53,9 +36,9 @@ async function getTranslations(
   doc: vscode.TextDocument,
   range: vscode.Range
 ): Promise<TranslationResult | null> {
-  const languageId = doc.languageId;
+  const syntax = await getCommentSyntax(doc.languageId);
+  const blockSyntax = syntax.block;
   const lines: LineInfo[] = [];
-  const blockSyntax = BLOCK_COMMENT_SYNTAX[languageId];
   let inBlock = false;
   let blockClose = "";
 
@@ -108,7 +91,7 @@ async function getTranslations(
     }
 
     // Single-line block comment or line comment
-    const info = extractComment(rawLine, languageId);
+    const info = extractComment(rawLine, syntax);
     if (info && info.text.length > 0) {
       lines.push({ line: i, ...info });
     }
@@ -307,6 +290,17 @@ function getEffectiveRange(editor: vscode.TextEditor): vscode.Range {
   return new vscode.Range(line, 0, line, editor.document.lineAt(line).text.length);
 }
 
+// Shows a hint when VS Code couldn't identify the file's language, which usually
+// means no extension is installed for that file type and comment detection may
+// have missed the file's actual comment syntax.
+function warnIfUnrecognized(doc: vscode.TextDocument): void {
+  if (doc.languageId === "plaintext") {
+    vscode.window.showInformationMessage(
+      "VSTranslate: No comments found. VS Code didn't recognize this file type — installing a language extension for it may help."
+    );
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   const overlayManager = new OverlayManager();
 
@@ -321,6 +315,8 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = await getTranslations(editor.document, getEffectiveRange(editor));
         if (result) {
           overlayManager.showTranslation(editor, result.translations);
+        } else {
+          warnIfUnrecognized(editor.document);
         }
       } catch (err) {
         vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
@@ -337,7 +333,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       try {
         const result = await getTranslations(editor.document, getEffectiveRange(editor));
-        if (!result) { return; }
+        if (!result) { warnIfUnrecognized(editor.document); return; }
         await vscode.workspace.applyEdit(buildEdit(editor.document.uri, editor.document, result, "replace"));
       } catch (err) {
         vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
@@ -354,7 +350,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       try {
         const result = await getTranslations(editor.document, getEffectiveRange(editor));
-        if (!result) { return; }
+        if (!result) { warnIfUnrecognized(editor.document); return; }
         await vscode.workspace.applyEdit(buildEdit(editor.document.uri, editor.document, result, "insert"));
       } catch (err) {
         vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
@@ -383,7 +379,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const originalText = doc.getText();
         const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
         const result = await getTranslations(doc, fileRange);
-        if (!result) { return; }
+        if (!result) { warnIfUnrecognized(doc); return; }
         await vscode.workspace.applyEdit(buildEdit(doc.uri, doc, result, pick.mode));
         await doc.save();
         showUndoNotification("File translated. Undo?", new Map([[doc.uri, originalText]]));
@@ -420,11 +416,11 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       const filtered = uris.filter((uri) => {
         const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
-        return KNOWN_EXTENSIONS.has(ext);
+        return !BINARY_EXTENSIONS.has(ext);
       });
 
       if (filtered.length === 0) {
-        vscode.window.showInformationMessage("VSTranslate: No recognized source files found in workspace.");
+        vscode.window.showInformationMessage("VSTranslate: No text files found in workspace.");
         return;
       }
 
@@ -525,11 +521,11 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       const filtered = uris.filter((uri) => {
         const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
-        return KNOWN_EXTENSIONS.has(ext);
+        return !BINARY_EXTENSIONS.has(ext);
       });
 
       if (filtered.length === 0) {
-        vscode.window.showInformationMessage("VSTranslate: No recognized source files found in workspace.");
+        vscode.window.showInformationMessage("VSTranslate: No text files found in workspace.");
         return;
       }
 
@@ -635,11 +631,11 @@ export function activate(context: vscode.ExtensionContext): void {
       const allFiles = (await Promise.all(roots.map(collectFiles))).flat();
       const filtered = allFiles.filter((uri) => {
         const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
-        return KNOWN_EXTENSIONS.has(ext);
+        return !BINARY_EXTENSIONS.has(ext);
       });
 
       if (filtered.length === 0) {
-        vscode.window.showErrorMessage("VSTranslate: None of the selected files have a recognized source file extension.");
+        vscode.window.showErrorMessage("VSTranslate: None of the selected files are text files.");
         return;
       }
 
@@ -702,11 +698,11 @@ export function activate(context: vscode.ExtensionContext): void {
       const allFiles = (await Promise.all(roots.map(collectFiles))).flat();
       const filtered = allFiles.filter((uri) => {
         const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
-        return KNOWN_EXTENSIONS.has(ext);
+        return !BINARY_EXTENSIONS.has(ext);
       });
 
       if (filtered.length === 0) {
-        vscode.window.showErrorMessage("VSTranslate: None of the selected files have a recognized source file extension.");
+        vscode.window.showErrorMessage("VSTranslate: None of the selected files are text files.");
         return;
       }
 

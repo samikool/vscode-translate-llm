@@ -13,7 +13,11 @@ export const COMMENT_PREFIXES: Record<string, string[]> = {
   matlab: ["%"], latex: ["%"],
   clojure: [";"], lisp: [";"],
   verilog: ["//"], systemverilog: ["//"],
-  ocaml: [],
+  // Block-comment-only or no-comment formats (empty = no line comments)
+  ocaml: [], css: [], scss: [], less: [], html: [], xml: [],
+  // Explicitly no comments — prevents false positives on # headings in markdown
+  // and avoids confusing JSONC's // with standard JSON (which has no comments).
+  markdown: [], json: [],
 };
 
 // Block comment open/close delimiters for languages that support them
@@ -51,6 +55,11 @@ export function findUnquotedIndex(line: string, prefix: string): number {
   return -1;
 }
 
+export interface CommentSyntax {
+  linePrefixes: string[];
+  block?: { open: string; close: string };
+}
+
 export interface CommentInfo {
   text: string;
   prefix: string;
@@ -64,9 +73,9 @@ export interface CommentInfo {
 // Returns the comment text (stripped of its marker) plus location metadata.
 // Handles single-line block comments (/* ... */) as well as line comments.
 // Returns null if the line contains no comment.
-export function extractComment(line: string, languageId: string): CommentInfo | null {
-  const block = BLOCK_COMMENT_SYNTAX[languageId];
-  const prefixes = COMMENT_PREFIXES[languageId] ?? FALLBACK_PREFIXES;
+export function extractComment(line: string, syntax: CommentSyntax): CommentInfo | null {
+  const block = syntax.block;
+  const prefixes = syntax.linePrefixes;
   const trimmed = line.trim();
 
   // Single-line block comment: open and close both appear on this line.

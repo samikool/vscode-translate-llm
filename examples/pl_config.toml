@@ -1,0 +1,37 @@
+# Konfiguracja systemu analizy statystyk
+# Wersja: 2.1.0
+
+# Ustawienia serwera bazy danych
+[baza_danych]
+host = "localhost"         # Adres serwera
+port = 5432                # Domyślny port PostgreSQL
+nazwa = "statystyki_prod"  # Nazwa bazy danych produkcyjnej
+# Maksymalna liczba jednoczesnych połączeń
+max_polaczen = 20
+
+# Parametry przetwarzania danych
+[przetwarzanie]
+# Liczba wątków roboczych do obliczeń równoległych
+watki = 8
+# Rozmiar partii danych przetwarzanych jednocześnie
+rozmiar_partii = 1000
+# Limit czasu operacji w sekundach
+limit_czasu = 30
+
+# Konfiguracja raportów
+[raporty]
+# Katalog wyjściowy dla wygenerowanych raportów
+katalog_wyjsciowy = "/var/reports/statystyki"
+# Obsługiwane formaty eksportu
+formaty = ["pdf", "xlsx", "csv"]
+# Harmonogram automatycznego generowania (wyrażenie cron)
+harmonogram = "0 6 * * 1"  # Każdy poniedziałek o 6:00
+
+# Progi alertów dla anomalii statystycznych
+[alerty]
+# Próg odchylenia standardowego dla wykrywania wartości odstających
+prog_odchylenia = 2.5
+# Minimalna liczba próbek wymagana do analizy
+min_probki = 30
+# Adresy email odbiorców powiadomień
+odbiorcy = ["analityk@firma.pl", "menedzer@firma.pl"]
