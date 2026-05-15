@@ -21,7 +21,7 @@
     "commands": [
       {
         "command": "vstranslate.translate",
-        "title": "Show Translated Comments",
+        "title": "Translate Comments (Overlay)",
         "category": "VSTranslate"
       },
       {
@@ -35,13 +35,23 @@
         "category": "VSTranslate"
       },
       {
-        "command": "vstranslate.translateFile",
-        "title": "Translate Whole File",
+        "command": "vstranslate.replaceFile",
+        "title": "Replace Comments in Whole File",
         "category": "VSTranslate"
       },
       {
-        "command": "vstranslate.translateWorkspace",
-        "title": "Translate Whole Workspace",
+        "command": "vstranslate.insertFile",
+        "title": "Insert Translated Comments in Whole File",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.replaceWorkspace",
+        "title": "Replace Comments in Entire Workspace",
+        "category": "VSTranslate"
+      },
+      {
+        "command": "vstranslate.insertWorkspace",
+        "title": "Insert Translated Comments in Entire Workspace",
         "category": "VSTranslate"
       },
       {
@@ -86,8 +96,18 @@
       },
       {
         "command": "vstranslate.translateRaw",
-        "title": "Translate Selected Text",
+        "title": "Translate Selection (Raw)…",
         "category": "VSTranslate"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "vstranslate.comments",
+        "label": "Comments"
+      },
+      {
+        "id": "vstranslate.strings",
+        "label": "Strings"
       }
     ],
     "menus": {
@@ -98,49 +118,73 @@
           "group": "vstranslate@1"
         },
         {
-          "command": "vstranslate.replaceComments",
-          "when": "editorTextFocus",
+          "command": "vstranslate.translateRaw",
+          "when": "editorHasSelection",
           "group": "vstranslate@2"
         },
         {
-          "command": "vstranslate.insertComments",
+          "submenu": "vstranslate.comments",
           "when": "editorTextFocus",
           "group": "vstranslate@3"
         },
         {
-          "command": "vstranslate.translateFile",
-          "when": "editorIsOpen",
+          "submenu": "vstranslate.strings",
+          "when": "editorTextFocus",
           "group": "vstranslate@4"
+        }
+      ],
+      "vstranslate.comments": [
+        {
+          "command": "vstranslate.replaceComments",
+          "when": "editorTextFocus",
+          "group": "1_selection@1"
         },
         {
-          "command": "vstranslate.translateWorkspace",
-          "when": "editorIsOpen",
-          "group": "vstranslate@5"
+          "command": "vstranslate.insertComments",
+          "when": "editorTextFocus",
+          "group": "1_selection@2"
         },
+        {
+          "command": "vstranslate.replaceFile",
+          "when": "editorIsOpen",
+          "group": "2_file@1"
+        },
+        {
+          "command": "vstranslate.insertFile",
+          "when": "editorIsOpen",
+          "group": "2_file@2"
+        },
+        {
+          "command": "vstranslate.replaceWorkspace",
+          "when": "editorIsOpen",
+          "group": "3_workspace@1"
+        },
+        {
+          "command": "vstranslate.insertWorkspace",
+          "when": "editorIsOpen",
+          "group": "3_workspace@2"
+        }
+      ],
+      "vstranslate.strings": [
         {
           "command": "vstranslate.translateStrings",
           "when": "editorTextFocus",
-          "group": "vstranslate@6"
+          "group": "1_view@1"
         },
         {
           "command": "vstranslate.replaceStrings",
           "when": "editorTextFocus",
-          "group": "vstranslate@7"
+          "group": "1_view@2"
         },
         {
           "command": "vstranslate.translateStringsFile",
           "when": "editorIsOpen",
-          "group": "vstranslate@8"
+          "group": "2_file@1"
         },
         {
           "command": "vstranslate.translateStringsWorkspace",
           "when": "editorIsOpen",
-          "group": "vstranslate@9"
-        },
-        {
-          "command": "vstranslate.translateRaw",
-          "when": "editorHasSelection",
-          "group": "vstranslate@10"
+          "group": "2_file@2"
         }
       ],
       "explorer/context": [

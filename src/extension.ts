@@ -358,121 +358,97 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
-  // Command 4: translate whole file — prompts for replace or insert mode
-  const translateFileCommand = vscode.commands.registerCommand(
-    "vstranslate.translateFile",
-    async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
-
-      const pick = await vscode.window.showQuickPick(
-        [
-          { label: "Replace Comments with Translation", mode: "replace" as const },
-          { label: "Insert Translated Comments", mode: "insert" as const },
-        ],
-        { placeHolder: "How should the translations be applied?" }
-      );
-      if (!pick) { return; }
-
-      try {
-        const doc = editor.document;
-        const originalText = doc.getText();
-        const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
-        const result = await getTranslations(doc, fileRange);
-        if (!result) { warnIfUnrecognized(doc); return; }
-        await vscode.workspace.applyEdit(buildEdit(doc.uri, doc, result, pick.mode));
-        await doc.save();
-        showUndoNotification("File translated. Undo?", new Map([[doc.uri, originalText]]));
-      } catch (err) {
-        vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
-      }
+  async function translateFileWithMode(mode: "replace" | "insert"): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) { vscode.window.showErrorMessage("VSTranslate: No active editor."); return; }
+    try {
+      const doc = editor.document;
+      const originalText = doc.getText();
+      const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+      const result = await getTranslations(doc, fileRange);
+      if (!result) { warnIfUnrecognized(doc); return; }
+      await vscode.workspace.applyEdit(buildEdit(doc.uri, doc, result, mode));
+      await doc.save();
+      showUndoNotification("File translated. Undo?", new Map([[doc.uri, originalText]]));
+    } catch (err) {
+      vscode.window.showErrorMessage(`VSTranslate: ${err instanceof Error ? err.message : String(err)}`);
     }
-  );
+  }
 
-  // Command 5: translate whole workspace — prompts for mode, confirms, then processes file by file
-  const translateWorkspaceCommand = vscode.commands.registerCommand(
-    "vstranslate.translateWorkspace",
-    async () => {
-      const pick = await vscode.window.showQuickPick(
-        [
-          { label: "Replace Comments with Translation", mode: "replace" as const },
-          { label: "Insert Translated Comments", mode: "insert" as const },
-        ],
-        { placeHolder: "How should the translations be applied?" }
-      );
-      if (!pick) { return; }
+  async function translateWorkspaceWithMode(mode: "replace" | "insert"): Promise<void> {
+    const confirmed = await vscode.window.showWarningMessage(
+      "This will modify all text files in the workspace. Continue?",
+      { modal: true },
+      "Yes"
+    );
+    if (confirmed !== "Yes") { return; }
 
-      const confirmed = await vscode.window.showWarningMessage(
-        "This will modify all recognized source files in the workspace. Continue?",
-        { modal: true },
-        "Yes"
-      );
-      if (confirmed !== "Yes") { return; }
+    const uris = await vscode.workspace.findFiles(
+      "**/*",
+      "{**/node_modules/**,**/dist/**,**/out/**,**/.git/**}"
+    );
+    const filtered = uris.filter((uri) => {
+      const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
+      return !BINARY_EXTENSIONS.has(ext);
+    });
 
-      // Find all files with known extensions
-      const uris = await vscode.workspace.findFiles(
-        "**/*",
-        "{**/node_modules/**,**/dist/**,**/out/**,**/.git/**}"
-      );
-      const filtered = uris.filter((uri) => {
-        const ext = uri.fsPath.split(".").pop()?.toLowerCase() ?? "";
-        return !BINARY_EXTENSIONS.has(ext);
-      });
+    if (filtered.length === 0) {
+      vscode.window.showInformationMessage("VSTranslate: No text files found in workspace.");
+      return;
+    }
 
-      if (filtered.length === 0) {
-        vscode.window.showInformationMessage("VSTranslate: No text files found in workspace.");
-        return;
-      }
+    const originals = new Map<vscode.Uri, string>();
+    let failedFile: string | undefined;
 
-      const originals = new Map<vscode.Uri, string>();
-      let failedFile: string | undefined;
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "VSTranslate: Translating workspace",
-          cancellable: true,
-        },
-        async (progress, token) => {
-          for (let i = 0; i < filtered.length; i++) {
-            if (token.isCancellationRequested) { break; }
-
-            const uri = filtered[i];
-            const fileName = uri.fsPath.split(/[\\/]/).pop() ?? uri.fsPath;
-            progress.report({ message: `${fileName} (${i + 1} of ${filtered.length})`, increment: (1 / filtered.length) * 100 });
-
-            try {
-              const doc = await vscode.workspace.openTextDocument(uri);
-              const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
-              const result = await getTranslations(doc, fileRange);
-              if (!result) { continue; }
-
-              const originalText = doc.getText();
-              await vscode.workspace.applyEdit(buildEdit(uri, doc, result, pick.mode));
-              await doc.save();
-              originals.set(uri, originalText);
-            } catch {
-              failedFile = fileName;
-              break;
-            }
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: "VSTranslate: Translating workspace", cancellable: true },
+      async (progress, token) => {
+        for (let i = 0; i < filtered.length; i++) {
+          if (token.isCancellationRequested) { break; }
+          const uri = filtered[i];
+          const fileName = uri.fsPath.split(/[\\/]/).pop() ?? uri.fsPath;
+          progress.report({ message: `${fileName} (${i + 1} of ${filtered.length})`, increment: (1 / filtered.length) * 100 });
+          try {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            const fileRange = new vscode.Range(0, 0, doc.lineCount - 1, doc.lineAt(doc.lineCount - 1).text.length);
+            const result = await getTranslations(doc, fileRange);
+            if (!result) { continue; }
+            const originalText = doc.getText();
+            await vscode.workspace.applyEdit(buildEdit(uri, doc, result, mode));
+            await doc.save();
+            originals.set(uri, originalText);
+          } catch {
+            failedFile = fileName;
+            break;
           }
         }
-      );
-
-      if (failedFile) {
-        vscode.window.showErrorMessage(`VSTranslate: Failed on "${failedFile}".`);
-        if (originals.size > 0) {
-          showUndoNotification(
-            `${originals.size} file(s) were modified before the failure. Undo?`,
-            originals
-          );
-        }
-      } else if (originals.size > 0) {
-        showUndoNotification(`Translated ${originals.size} file(s). Undo?`, originals);
-      } else {
-        vscode.window.showInformationMessage("VSTranslate: No non-English comments found in workspace.");
       }
+    );
+
+    if (failedFile) {
+      vscode.window.showErrorMessage(`VSTranslate: Failed on "${failedFile}".`);
+      if (originals.size > 0) {
+        showUndoNotification(`${originals.size} file(s) were modified before the failure. Undo?`, originals);
+      }
+    } else if (originals.size > 0) {
+      showUndoNotification(`Translated ${originals.size} file(s). Undo?`, originals);
+    } else {
+      vscode.window.showInformationMessage("VSTranslate: No non-English comments found in workspace.");
     }
+  }
+
+  // Commands 4-7: file and workspace translation, mode baked into the command
+  const replaceFileCommand = vscode.commands.registerCommand(
+    "vstranslate.replaceFile", () => translateFileWithMode("replace")
+  );
+  const insertFileCommand = vscode.commands.registerCommand(
+    "vstranslate.insertFile", () => translateFileWithMode("insert")
+  );
+  const replaceWorkspaceCommand = vscode.commands.registerCommand(
+    "vstranslate.replaceWorkspace", () => translateWorkspaceWithMode("replace")
+  );
+  const insertWorkspaceCommand = vscode.commands.registerCommand(
+    "vstranslate.insertWorkspace", () => translateWorkspaceWithMode("insert")
   );
 
   // Command: translate all strings in the current file (replace in-place)
@@ -887,8 +863,10 @@ export function activate(context: vscode.ExtensionContext): void {
     translateCommand,
     replaceCommand,
     insertCommand,
-    translateFileCommand,
-    translateWorkspaceCommand,
+    replaceFileCommand,
+    insertFileCommand,
+    replaceWorkspaceCommand,
+    insertWorkspaceCommand,
     translateStringsFileCommand,
     translateStringsWorkspaceCommand,
     translateStringsCommand,
