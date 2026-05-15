@@ -4,6 +4,20 @@ All notable changes to VSTranslate will be documented here.
 
 ---
 
+## [0.5.0] — 2026-05-15
+
+### Added
+- Dynamic comment syntax detection: extension now reads language configuration from any installed VS Code extension, so any language with a registered comment syntax works automatically
+- Translate Selection (Raw) command — translates any highlighted text directly, bypassing comment detection, with overlay/insert/replace modes
+- Example files for XML (Portuguese), SQL (Turkish), and TOML (Polish)
+
+### Changed
+- Context menu reorganized into Comments and Strings submenus for a cleaner right-click experience
+- File and workspace translation commands are now separate menu items (Replace / Insert) instead of a QuickPick dialog
+- Unrecognized file types (opened as plaintext) now show a helpful hint to install a language extension when no comments are found
+
+---
+
 ## [0.4.0] — 2026-05-05
 
 ### Added
